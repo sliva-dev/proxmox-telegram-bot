@@ -1,0 +1,196 @@
+**🤖 Proxmox VE Telegram Bot**
+
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg?logo=python&logoColor=white)](https://python.org)
+[![python-telegram-bot](https://img.shields.io/badge/telegram--bot-v22.5-2CA5E0.svg?logo=telegram)](https://python-telegram-bot.org)
+[![Proxmox VE](https://img.shields.io/badge/Proxmox-8.x%2B-EC6601.svg?logo=proxmox)](https://proxmox.com)
+[![License MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/Version-1.3-blue.svg)](https://github.com/sliva/proxmox-telegram-bot)
+
+> **Самый продвинутый и безопасный Telegram-бот для управления Proxmox VE в 2025 году**
+> Всё, что нужно системному администратору: мониторинг, алерты, управление VM/LXC и безопасный шелл — прямо в чате.
+
+_Это мой первый публичный репозиторий, поэтому не ругайте строго ✨_
+
+---
+
+## ✨ Возможности
+
+| Категория           | Функционал                      | Описание                                                |
+| ------------------- | ------------------------------- | ------------------------------------------------------- |
+| **📊 Мониторинг**   | Статус хоста (`/status`)        | Аптайм, нагрузка CPU, RAM, диски, температуры           |
+|                     | Списки VM/LXC (`/vm`, `/lxc`)   | Кнопочное управление, метрики реального времени         |
+| **⚡ Управление**   | Управление VM/LXC               | Start / Stop / Reboot с подтверждением                  |
+|                     | Поддержка кластера              | Автоматический поиск ноды по VMID                       |
+| **🔧 Утилиты**      | Безопасная консоль (`/console`) | Таймаут 30с, чёрный список команд, обрезка вывода       |
+|                     | Автоматические алерты           | Мониторинг перегрева, нагрузки CPU/RAM                  |
+| **🔐 Безопасность** | Whitelist-доступ                | Только указанные Telegram ID                            |
+|                     | Уведомления о попытках доступа  | Админы получают оповещения о неавторизованных действиях |
+
+---
+
+## 🚀 Быстрый старт
+
+### Установка
+
+```bash
+cd /opt
+git clone https://github.com/sliva/proxmox-telegram-bot.git
+cd proxmox-telegram-bot
+
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+Конфигурация
+
+Создайте файл `.env`:
+
+```env
+# Telegram
+BOT_TOKEN=your_bot_token_from_BotFather
+WHITELIST=your_telegram_id
+
+# Proxmox (рекомендуется API Token!)
+HOST=your_proxmox_ip
+PROXMOX_TOKEN_NAME=telegram-bot@pve!
+PROXMOX_TOKEN_VALUE=your_token_value
+PROXMOX_PORT=8006
+
+# Настройки алертов
+CPU_TEMP_THRESHOLD=80
+CPU_USAGE_THRESHOLD=70
+RAM_USAGE_THRESHOLD=70
+CHECK_INTERVAL=30
+```
+
+> 💡 Как создать токен в Proxmox: > `Datacenter → Permissions → API Tokens → Add`
+> Права: `/`
+
+Запуск
+
+```bash
+python main.py
+```
+
+---
+
+## 🎯 Команды бота
+
+| Команда          | Описание                                        |
+| ---------------- | ----------------------------------------------- |
+| `/start`         | Приветствие и список команд                     |
+| `/status`        | Полная сводка по хосту                          |
+| `/vm`            | Список всех виртуальных машин                   |
+| `/lxc`           | Список всех LXC-контейнеров                     |
+| `/console <cmd>` | Выполнить команду (`htop`, `zpool status`, etc) |
+
+---
+
+## 🔧 Автозапуск через systemd
+
+Создайте файл `/etc/systemd/system/proxmox-bot.service`:
+
+```ini
+[Unit]
+Description=Proxmox VE Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/proxmox-telegram-bot
+ExecStart=/opt/proxmox-telegram-bot/venv/bin/python /opt/proxmox-telegram-bot/main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Активируйте сервис:
+
+```bash
+systemctl daemon-reload
+systemctl enable --now proxmox-bot.service
+```
+
+---
+
+## 🛡️ Безопасность
+
+### Многоуровневая защита:
+
+- ✅ **Whitelist-авторизация** — только разрешённые Telegram ID
+- ✅ **Уведомления о попытках взлома** — мгновенные оповещения админам
+- ✅ **Защищённая консоль** — жёсткий чёрный список команд:
+  - `rm -rf /`, `mkfs`, `fdisk`, `dd of=/dev/`, `wipefs`
+  - `shutdown`, `reboot`, `halt`, `poweroff`
+  - Форк-бомбы и опасные конструкции
+- ✅ **Таймауты выполнения** — максимум 30 секунд на команду
+- ✅ **Обрезка вывода** — ограничение 4000 символов
+
+---
+
+## 📁 Структура проекта
+
+```
+proxmox-telegram-bot/
+├── main.py              # Точка входа, запуск бота и алертов
+├── config.py            # Загрузка конфигурации .env
+├── alerts.py            # Система мониторинга и алертов
+├── bot_handlers.py      # Обработчики команд (/start, /status, /console)
+├── unified_handlers.py  # Единый обработчик VM и LXC
+├── proxmox_utils.py     # API Proxmox + retry + singleton
+├── system_utils.py      # Psutil + sensors + статус системы
+├── auth.py              # Whitelist + уведомления безопасности
+├── requirements.txt     # Зависимости проекта
+├── .env                 # Конфигурация (не в репозитории)
+└── bot.log              # Логи с ротацией
+```
+
+---
+
+## 📸 Демонстрация
+
+<div align="center">
+
+### 🖥️ Интерфейс бота в действии
+
+<div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+
+<img src="https://i.imgur.com/ku2SgWv.png" width="280" style="border: 1px solid #ddd; border-radius: 8px; padding: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1)" alt="Главное меню" />
+
+<img src="https://i.imgur.com/zPDWyjF.png" width="280" style="border: 1px solid #ddd; border-radius: 8px; padding: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1)" alt="Выбор режима" />
+
+<img src="https://i.imgur.com/Bq4Abvw.png" width="280" style="border: 1px solid #ddd; border-radius: 8px; padding: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1)" alt="Процесс работы" />
+
+</div>
+</div>
+
+---
+
+## 📄 Лицензия
+
+**MIT License** — полная свобода использования с ответственностью.
+
+```
+MIT License © 2025 Sliva
+```
+
+---
+
+<div align="center">
+
+### ⭐ Если проект понравился — поставьте звезду!
+
+### 🐛 Нашли баг? — Создайте Issue
+
+### 💡 Хотите помочь? — Pull Request приветствуется!
+
+**Автор:** Sliva
+**Версия:** 1.3 (ноябрь 2025)
+
+</div>
